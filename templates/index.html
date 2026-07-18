@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digit Recognition</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 50px;
+        }
+        /* CSS makes it black for the UI */
+        #canvas {
+            background-color: black; 
+            border: 3px solid #333;
+            border-radius: 5px;
+            cursor: crosshair;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .controls { margin-top: 20px; }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 0 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+        button#clear-btn { background-color: #dc3545; }
+        #result {
+            margin-top: 30px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <h2>Draw a Digit (0-9)</h2>
+    <canvas id="canvas" width="280" height="280"></canvas>
+    
+    <div class="controls">
+        <button id="clear-btn">Clear</button>
+        <button id="predict-btn">Predict</button>
+    </div>
+    
+    <div id="result"></div>
+
+    <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const resultDiv = document.getElementById('result');
+    
+    let isDrawing = false;
+
+    // --- CRITICAL FIX: physically paint the canvas black on load ---
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Set up the "ink"
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 20;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // Mobile Touch Events
+    canvas.addEventListener('touchstart', (e) => { 
+        isDrawing = true; 
+        e.preventDefault(); // This stops the screen from scrolling while they draw
+    });
+    
+    canvas.addEventListener('touchend', () => { 
+        isDrawing = false; 
+        ctx.beginPath(); 
+    });
+    
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!isDrawing) return;
+        
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+    });
+    // Desktop Mouse Events
+    canvas.addEventListener('mousedown', (e) => {
+        isDrawing = true;
+        draw(e);
+    });
+    canvas.addEventListener('mouseup', () => {
+        isDrawing = false;
+        ctx.beginPath();
+    });
+    canvas.addEventListener('mousemove', draw);
+
+    function draw(e) {
+        if (!isDrawing) return;
+        
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+    }
+
+    // Clear Canvas Button
+    document.getElementById('clear-btn').addEventListener('click', () => {
+        // --- CRITICAL FIX: repaint black when clearing ---
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        resultDiv.innerText = '';
+    });
+
+    // Predict Button
+    document.getElementById('predict-btn').addEventListener('click', async () => {
+        resultDiv.innerText = 'Thinking...';
+        
+        const dataURL = canvas.toDataURL('image/png');
+
+        try {
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: dataURL })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                const certainty = (data.confidence * 100).toFixed(2);
+                resultDiv.innerText = `Prediction: ${data.prediction} (${certainty}%)`;
+            } else {
+                resultDiv.innerText = `Error: ${data.error}`;
+            }
+        } catch (error) {
+            console.error('Server error:', error);
+            resultDiv.innerText = 'Failed to reach the server.';
+        }
+    });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
