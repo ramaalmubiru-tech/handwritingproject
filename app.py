@@ -1,69 +1,57 @@
-import os
-import base64
-import keras
-from flask import Flask, request, jsonify,render_template
-import tensorflow as tf
-import io
 import numpy as np
 from PIL import Image
+import io
+import base64
+import tflite_runtime.interpreter as tflite
+from flask import Flask, request, jsonify
 
-app=Flask(__name__)
+app = Flask(__name__)
 
-MODEL_PATH ="my_model.h5"
-model = tf.keras.models.load_model(MODEL_PATH)
+# Load the TFLite model and allocate tensors
+interpreter = tflite.Interpreter(model_path="model.tflite")
+interpreter.allocate_tensors()
 
+# Get input and output details for the model shape
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 
-def preprocess_image(image_b64):
-
-
-    image_data=base64.b64decode(image_b64.split(',')[1])
-
-
-    img=Image.open(io.BytesIO(image_data))
-
-
-    img=img.convert('L').resize((28,28))
-
-    img_array=np.array(img)
-
-
-    img_array=img_array.astype('float32')/255.0
-
-
-    img_array=img_array.reshape(1,28,28,1)
-
+def preprocess_image(base64_string):
+    # Decode base64 image string
+    img_data = base64.b64decode(base64_string.split(',')[1])
+    img = Image.open(io.BytesIO(img_data)).convert('L') # Convert to grayscale
+    img = img.resize((28, 28)) # Resize to MNIST standard
+    
+    # Normalize pixel values to [0.0, 1.0] and match shape (1, 28, 28, 1)
+    img_array = np.array(img, dtype=np.float32) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+    img_array = np.expand_dims(img_array, axis=-1)
     return img_array
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    try:
+        data = request.get_json()
+        processed_img = preprocess_image(data['image'])
+        
+        # Feed the processed image into the TFLite interpreter
+        interpreter.set_tensor(input_details[0]['index'], processed_img)
+        interpreter.invoke()
+        
+        # Extract the prediction percentages
+        predictions = interpreter.get_tensor(output_details[0]['index'])[0]
+        predicted_digit = int(np.argmax(predictions))
+        
+        return jsonify({'prediction': predicted_digit, 'status': 'success'})
+    except Exception as e:
+        return jsonify({'error': str(e), 'status': 'failed'}), 500
+
+
 
 
 @app.route('/')
 def home():
     return render_template('index.html')
 
-
-@app.route('/predict',methods=['POST'])
-def predict():
-    data=request.get_json()
-
-
-    if not data or 'image' not in data:
-        return jsonify({'error':'No image data provided'}),400
-    
-    try:
-        processed_img=preprocess_image(data['image'])
-        
-
-        debug_img_array=(processed_img[0, :, :, 0]*255).astype(np.uint8)
-        Image.fromarray(debug_img_array).save('debug_view.png')
-        predictions=model.predict(processed_img)
-        predicted_digit=int(np.argmax(predictions[0]))
-        confidence=float(np.max(predictions[0]))
-
-        return jsonify({
-            'prediction':predicted_digit,
-            'confidence':confidence
-        })
-    except Exception as e:
-        return jsonify({'error':str(e)}),500
     
 
 if __name__=='__main__':
