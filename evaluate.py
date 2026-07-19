@@ -14,6 +14,9 @@ print("Loading model...")
 # Ensure this matches your actual saved model name
 model = tf.keras.models.load_model("my_model.h5")
 
+
+
+a=2
 print("Generating predictions...")
 # Predict all 10,000 test images
 predictions = model.predict(features_test)
