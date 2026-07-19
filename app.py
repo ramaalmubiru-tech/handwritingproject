@@ -36,12 +36,14 @@ def predict():
         # Feed the processed image into the TFLite interpreter
         interpreter.set_tensor(input_details[0]['index'], processed_img)
         interpreter.invoke()
-        
+        confidence_score=float(np.max(predictions)*100)
         # Extract the prediction percentages
         predictions = interpreter.get_tensor(output_details[0]['index'])[0]
         predicted_digit = int(np.argmax(predictions))
         
-        return jsonify({'prediction': predicted_digit, 'status': 'success'})
+        return jsonify({'prediction': predicted_digit, 
+                        'confidence': round(confidence_score, 2),
+                          'status': 'success'})
     except Exception as e:
         return jsonify({'error': str(e), 'status': 'failed'}), 500
 
