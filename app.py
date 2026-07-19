@@ -3,7 +3,7 @@ from PIL import Image
 import io
 import base64
 import tflite_runtime.interpreter as tflite
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify,render_template
 
 app = Flask(__name__)
 

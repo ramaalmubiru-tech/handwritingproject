@@ -3,6 +3,7 @@ import tensorflow as tf
 from keras.datasets import mnist
 from sklearn.metrics import classification_report, confusion_matrix
 
+
 print("Loading test data...")
 # We only need the test data for evaluation
 (_, _), (features_test, labels_test) = mnist.load_data()
